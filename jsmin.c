@@ -34,6 +34,7 @@ typedef struct _state {
 	int look_ahead;
 	int the_x;
 	int the_y;
+	FILE *fd;
 } state_t;
 
 void error(char* string) {
@@ -69,7 +70,7 @@ int get(state_t * state) {
 	int codeunit = state->look_ahead;
 	state->look_ahead = EOF;
 	if (codeunit == EOF) {
-		codeunit = getc(stdin);
+		codeunit = getc(state->fd);
 	}
 	if (codeunit >= ' ' || codeunit == '\n' || codeunit == EOF) {
 		return codeunit;
@@ -324,6 +325,7 @@ extern int main(int argc, char* argv[]) {
 	state->look_ahead=EOF;
 	state->the_x=EOF;
 	state->the_y=EOF;
+	state->fd=stdin;
 	jsmin(state);
 	free(state);
 	return 0;
