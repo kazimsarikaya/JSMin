@@ -34,7 +34,9 @@ typedef struct _state {
 	int look_ahead;
 	int the_x;
 	int the_y;
-	FILE *fd;
+	FILE *input;
+	FILE *output;
+	void (*error)(char*);
 } state_t;
 
 void error(char* string) {
@@ -70,7 +72,7 @@ int get(state_t * state) {
 	int codeunit = state->look_ahead;
 	state->look_ahead = EOF;
 	if (codeunit == EOF) {
-		codeunit = getc(state->fd);
+		codeunit = getc(state->input);
 	}
 	if (codeunit >= ' ' || codeunit == '\n' || codeunit == EOF) {
 		return codeunit;
@@ -118,7 +120,7 @@ int next(state_t *state) {
 					}
 					break;
 				case EOF:
-					error("Unterminated comment.");
+					state->error("Unterminated comment.");
 				}
 			}
 			break;
@@ -142,29 +144,29 @@ int next(state_t *state) {
 void action(int determined, state_t *state) {
 	switch (determined) {
 	case 1:
-		putc(state->the_a, stdout);
+		putc(state->the_a, state->output);
 		if (
 			(state->the_y == '\n' || state->the_y == ' ')
 			&& (state->the_a == '+' || state->the_a == '-' || state->the_a == '*' || state->the_a == '/')
 			&& (state->the_b == '+' || state->the_b == '-' || state->the_b == '*' || state->the_b == '/')
 			) {
-			putc(state->the_y, stdout);
+			putc(state->the_y, state->output);
 		}
 	case 2:
 		state->the_a = state->the_b;
 		if (state->the_a == '\'' || state->the_a == '"' || state->the_a == '`') {
 			for (;;) {
-				putc(state->the_a, stdout);
+				putc(state->the_a, state->output);
 				state->the_a = get(state);
 				if (state->the_a == state->the_b) {
 					break;
 				}
 				if (state->the_a == '\\') {
-					putc(state->the_a, stdout);
+					putc(state->the_a, state->output);
 					state->the_a = get(state);
 				}
 				if (state->the_a == EOF) {
-					error("Unterminated string literal.");
+					state->error("Unterminated string literal.");
 				}
 			}
 		}
@@ -177,26 +179,26 @@ void action(int determined, state_t *state) {
 					|| state->the_a == '*' || state->the_a == '/' || state->the_a == '{' || state->the_a == '}'
 					|| state->the_a == ';'
 					)) {
-			putc(state->the_a, stdout);
+			putc(state->the_a, state->output);
 			if (state->the_a == '/' || state->the_a == '*') {
-				putc(' ', stdout);
+				putc(' ', state->output);
 			}
-			putc(state->the_b, stdout);
+			putc(state->the_b, state->output);
 			for (;;) {
 				state->the_a = get(state);
 				if (state->the_a == '[') {
 					for (;;) {
-						putc(state->the_a, stdout);
+						putc(state->the_a, state->output);
 						state->the_a = get(state);
 						if (state->the_a == ']') {
 							break;
 						}
 						if (state->the_a == '\\') {
-							putc(state->the_a, stdout);
+							putc(state->the_a, state->output);
 							state->the_a = get(state);
 						}
 						if (state->the_a == EOF) {
-							error(
+							state->error(
 								"Unterminated set in Regular Expression literal."
 								);
 						}
@@ -205,19 +207,19 @@ void action(int determined, state_t *state) {
 					switch (peek(state)) {
 					case '/':
 					case '*':
-						error(
+						state->error(
 							"Unterminated set in Regular Expression literal."
 							);
 					}
 					break;
 				} else if (state->the_a =='\\') {
-					putc(state->the_a, stdout);
+					putc(state->the_a, state->output);
 					state->the_a = get(state);
 				}
 				if (state->the_a == EOF) {
-					error("Unterminated Regular Expression literal.");
+					state->error("Unterminated Regular Expression literal.");
 				}
-				putc(state->the_a, stdout);
+				putc(state->the_a, state->output);
 			}
 			state->the_b = next(state);
 		}
@@ -325,7 +327,9 @@ extern int main(int argc, char* argv[]) {
 	state->look_ahead=EOF;
 	state->the_x=EOF;
 	state->the_y=EOF;
-	state->fd=stdin;
+	state->input=stdin;
+	state->output=stdout;
+	state->error=&error;
 	jsmin(state);
 	free(state);
 	return 0;
